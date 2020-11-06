@@ -14,6 +14,7 @@ import jax
 from jax.experimental import optix
 import jax.numpy as jnp
 import rlax
+import chex
 
 from .experience_buffer import ExperienceBuffer
 from .priority_buffer import PriorityBuffer
@@ -62,27 +63,27 @@ class DQNPolicy:
     def legal_epsilon_greedy(epsilon=None):
         """An epsilon-greedy distribution with illegal probabilities set to zero"""
 
-        def sample_fn(key: rlax.ArrayLike,
-                      preferences: rlax.ArrayLike,
-                      legal: rlax.ArrayLike,
+        def sample_fn(key: chex.Array,
+                      preferences: chex.Array,
+                      legal: chex.Array,
                       epsilon=epsilon):
             probs = DQNPolicy._argmax_with_random_tie_breaking(preferences)
             probs = DQNPolicy._mix_with_legal_uniform(probs, epsilon, legal)
             return DQNPolicy._categorical_sample(key, probs)
 
-        def probs_fn(preferences: rlax.ArrayLike, legal: rlax.ArrayLike, epsilon=epsilon):
+        def probs_fn(preferences: chex.Array, legal: chex.Array, epsilon=epsilon):
             probs = DQNPolicy._argmax_with_random_tie_breaking(preferences)
             return DQNPolicy._mix_with_legal_uniform(probs, epsilon, legal)
 
-        def logprob_fn(sample: rlax.ArrayLike,
-                       preferences: rlax.ArrayLike,
-                       legal: rlax.ArrayLike,
+        def logprob_fn(sample: chex.Array,
+                       preferences: chex.Array,
+                       legal: chex.Array,
                        epsilon=epsilon):
             probs = DQNPolicy._argmax_with_random_tie_breaking(preferences)
             probs = DQNPolicy._mix_with_legal_uniform(probs, epsilon, legal)
             return rlax.base.batched_index(jnp.log(probs), sample)
 
-        def entropy_fn(preferences: rlax.ArrayLike, legal: rlax.ArrayLike, epsilon=epsilon):
+        def entropy_fn(preferences: chex.Array, legal: chex.Array, epsilon=epsilon):
             probs = DQNPolicy._argmax_with_random_tie_breaking(preferences)
             probs = DQNPolicy._mix_with_legal_uniform(probs, epsilon, legal)
             return -jnp.nansum(probs * jnp.log(probs), axis=-1)
@@ -91,15 +92,15 @@ class DQNPolicy:
 
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(0, 1))
+    @partial(jax.jit, static_argnums=(0))
     def policy(
             network,
             atoms,
             net_params,
             epsilon: float,
             key: float,
-            obs: rlax.ArrayLike,
-            lms: rlax.ArrayLike):
+            obs: chex.Array,
+            lms: chex.Array):
         """Sample action from epsilon-greedy policy.
 
         Args:
@@ -123,14 +124,14 @@ class DQNPolicy:
         return q_vals, actions
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(0, 1))
+    @partial(jax.jit, static_argnums=(0))
     def eval_policy(
             network,
             atoms,
             net_params,
             key,
-            obs: rlax.ArrayLike,
-            lms: rlax.ArrayLike):
+            obs: chex.Array,
+            lms: chex.Array):
         """Sample action from greedy policy.
         Args:
             network    -- haiku Transformed network.
@@ -151,7 +152,7 @@ class DQNPolicy:
 
 class DQNLearning:
     @staticmethod
-    @partial(jax.jit, static_argnums=(0, 1, 2))
+    @partial(jax.jit, static_argnums=(0, 2))
     def update_q(network, atoms, optimizer, online_params, trg_params, opt_state,
                  transitions, discount_t, prios, beta_is):
         """Update network weights wrt Q-learning loss.
@@ -250,7 +251,7 @@ class DQNAgent:
         self.trg_params = self.network.init(
             next(self.rng), observation_spec.generate_value().astype(onp.float16))
         self.online_params = self.trg_params
-        self.atoms = jnp.tile(jnp.linspace(-params.atom_vmax, params.atom_vmax, params.n_atoms),
+        self.atoms = onp.tile(jnp.linspace(-params.atom_vmax, params.atom_vmax, params.n_atoms),
                               (action_spec.num_values, 1))
 
         # Build and initialize optimizer.
