@@ -251,7 +251,7 @@ class DQNAgent:
         self.trg_params = self.network.init(
             next(self.rng), observation_spec.generate_value().astype(onp.float16))
         self.online_params = self.trg_params
-        self.atoms = onp.tile(jnp.linspace(-params.atom_vmax, params.atom_vmax, params.n_atoms),
+        self.atoms = jnp.tile(jnp.linspace(-params.atom_vmax, params.atom_vmax, params.n_atoms),
                               (action_spec.num_values, 1))
 
         # Build and initialize optimizer.
